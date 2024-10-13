@@ -1,0 +1,21 @@
+# Binaries
+counter/counter
+
+# Object files
+counter/*.o
+
+# Generated files
+# counter/counter_bpfeb.go
+# counter/counter_bpfel.go
+
+# Go modules
+counter/go.sum
+
+# IDE/editor specific files
+.vscode/
+.idea/
+*.iml
+
+# OS generated files
+.DS_Store
+Thumbs.db

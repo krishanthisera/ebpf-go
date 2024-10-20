@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	ifname = os.Getenv("IFNAME")
+	ifname = "eth0"
 )
 
 func main() {

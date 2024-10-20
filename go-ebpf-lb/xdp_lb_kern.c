@@ -2,17 +2,10 @@
 
 #include "xdp_lb_kern.h"
 
-#define DEST_IP  ((192U << 24) | (168U << 16) | (0U << 8) | 169U)
-#define DEST_MAC {0x60, 0x3e, 0x5f, 0x66, 0xdd, 0xab}
-
-static __always_inline void set_dest_addresses(struct ethhdr *eth, struct iphdr *iph) {
-    // Set static IP address for destination address to 192.168.0.169
-    iph->daddr = DEST_IP;
-
-    // Set destination MAC address to 60:3e:5f:66:dd:ab
-    unsigned char dest_mac[] = DEST_MAC;
-    __builtin_memcpy(eth->h_dest, dest_mac, ETH_ALEN);
-}
+#define IP_ADDRESS(x) (unsigned int)(172 + (17 << 8) + (0 << 16) + (x << 24))
+#define BACKEND 3 
+#define CLIENT 4
+#define LB 2
 
 SEC("xdp_lb")
 int xdp_load_balancer(struct xdp_md *ctx)
@@ -29,6 +22,7 @@ int xdp_load_balancer(struct xdp_md *ctx)
     if (bpf_ntohs(eth->h_proto) != ETH_P_IP)
         return XDP_PASS;
 
+
     // Check if this is an IP packet
     struct iphdr *iph = data + sizeof(struct ethhdr);
     if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
@@ -36,16 +30,26 @@ int xdp_load_balancer(struct xdp_md *ctx)
     
     if (iph->protocol != IPPROTO_TCP)
         return XDP_PASS;
+    
+    // If this is returning packet we should send it the client
+    if (iph->saddr == IP_ADDRESS(CLIENT))
+    {
+        iph->daddr = IP_ADDRESS(BACKEND);
+        eth->h_dest[5] = BACKEND;
+    }
+    else
+    {
+        iph->daddr = IP_ADDRESS(CLIENT);
+        eth->h_dest[5] = CLIENT;
+    }
 
-    // Set destination IP and MAC addresses
-    set_dest_addresses(eth, iph);
-
+    // Always set source IP and MAC
+    iph->saddr = IP_ADDRESS(LB);
+    eth->h_source[5] = LB;
     // Recalculate IP checksum
     iph->check = iph_csum(iph);
 
-    
-
-    // bpf_printk("lb: got a TCP packet from %x", iph->saddr);
+    bpf_printk("lb: routing packets %x mac %x", iph->daddr, eth->h_dest);
     return XDP_TX;
 }
 
